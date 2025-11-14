@@ -1,0 +1,5 @@
+--- Model Metrics ---
+R2: 0.9130
+MAE: 0.3995
+MSE: 0.2507
+RMSE: 0.5007
