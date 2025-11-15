@@ -22,21 +22,20 @@ COPY predict.py .
 # Copy the pre-trained models
 COPY models/ ./models/
 
-# Create models directory
-# RUN mkdir -p models
-
 # Expose port
 EXPOSE 5000
 
-# Set environment variables
+# Set environment variables for predict.py
 ENV FLASK_APP=predict.py
 ENV PORT=5000
 ENV MODEL_FILE=models/crop_yield_model.pkl
-ENV ENCODER_FILE=models/feature_encoder.pkl
+ENV SCALER_FILE=models/scaler.pkl
+ENV FEATURE_NAMES_FILE=models/feature_names.json
+ENV METRICS_FILE=models/model_metrics.json
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:5003/health')" || exit 1
 
 # Run the Flask application with Gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "predict:app"]

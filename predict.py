@@ -1,85 +1,135 @@
 #!/usr/bin/env python3
 """
 predict.py - Flask API for Crop Yield Prediction
-This script loads the trained Linear Regression model and serves predictions
+This script loads the trained Gradient Boosting model and serves predictions
 via a REST API endpoint.
 """
 
 import os
 import sys
+import json
 import joblib
 import pandas as pd
+import numpy as np
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from datetime import datetime
 
 # Initialize Flask app
 app = Flask(__name__)
 
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
+
 # Define paths
 MODEL_FILE = os.environ.get('MODEL_FILE', 'models/crop_yield_model.pkl')
-ENCODER_FILE = os.environ.get('ENCODER_FILE', 'models/feature_encoder.pkl')
+SCALER_FILE = os.environ.get('SCALER_FILE', 'models/scaler.pkl')
+METRICS_FILE = os.environ.get('METRICS_FILE', 'models/model_metrics.json')
+FEATURE_NAMES_FILE = os.environ.get('FEATURE_NAMES_FILE', 'models/feature_names.json')
 
-# Global variables to store the model and encoder
+# Global variables to store the model and related objects
 model = None
-feature_columns = None
+scaler = None
+feature_names = None
+model_metrics = None
 
 def load_model():
-    """Load the trained model and feature encoder from files."""
-    global model, feature_columns
+    """Load the trained model and related files."""
+    global model, scaler, feature_names, model_metrics
     
-    # Check if files exist before trying to load
-    if not os.path.exists(MODEL_FILE):
-        print(f"Error: Model file not found at {MODEL_FILE}", file=sys.stderr)
-        return False
-    if not os.path.exists(ENCODER_FILE):
-        print(f"Error: Encoder file not found at {ENCODER_FILE}", file=sys.stderr)
-        return False
-        
     try:
-        print(f"Loading model from {MODEL_FILE}...")
-        model = joblib.load(MODEL_FILE)
+        print("\n" + "="*80)
+        print("LOADING MODEL ARTIFACTS")
+        print("="*80)
         
-        print(f"Loading feature encoder from {ENCODER_FILE}...")
-        feature_columns = joblib.load(ENCODER_FILE)
+        # Load the model
+        if os.path.exists(MODEL_FILE):
+            print(f"Loading model from {MODEL_FILE}...")
+            model = joblib.load(MODEL_FILE)
+            print(f"✓ Model loaded successfully: {type(model).__name__}")
+        else:
+            print(f"✗ ERROR: Model file not found at {MODEL_FILE}")
+            print(f"  Current working directory: {os.getcwd()}")
+            print(f"  Files in models/: {os.listdir('models/') if os.path.exists('models/') else 'Directory does not exist'}")
+            return False
         
-        print("Model and encoder loaded successfully.")
+        # Load the scaler
+        if os.path.exists(SCALER_FILE):
+            print(f"Loading scaler from {SCALER_FILE}...")
+            scaler = joblib.load(SCALER_FILE)
+            print(f"✓ Scaler loaded successfully: {type(scaler).__name__}")
+        else:
+            print(f"✗ WARNING: Scaler file not found at {SCALER_FILE}")
+            scaler = None
+        
+        # Load feature names
+        if os.path.exists(FEATURE_NAMES_FILE):
+            print(f"Loading feature names from {FEATURE_NAMES_FILE}...")
+            with open(FEATURE_NAMES_FILE, 'r') as f:
+                feature_names = json.load(f)
+            print(f"✓ Feature names loaded successfully ({len(feature_names)} features)")
+        else:
+            print(f"✗ WARNING: Feature names file not found at {FEATURE_NAMES_FILE}")
+            feature_names = None
+        
+        # Load model metrics - check both .json and .txt extensions
+        metrics_file_to_use = METRICS_FILE
+        if not os.path.exists(METRICS_FILE):
+            # Try .txt extension if .json doesn't exist
+            alt_metrics_file = METRICS_FILE.replace('.json', '.txt')
+            if os.path.exists(alt_metrics_file):
+                metrics_file_to_use = alt_metrics_file
+        
+        if os.path.exists(metrics_file_to_use):
+            print(f"Loading model metrics from {metrics_file_to_use}...")
+            with open(metrics_file_to_use, 'r') as f:
+                model_metrics = json.load(f)
+            print(f"✓ Model metrics loaded successfully")
+            print(f"  - Model Type: {model_metrics.get('model_type', 'Unknown')}")
+            print(f"  - Test R² Score: {model_metrics.get('testing_metrics', {}).get('r2_score', 'N/A')}")
+        else:
+            print(f"✗ WARNING: Model metrics file not found at {METRICS_FILE}")
+            model_metrics = None
+        
+        print("="*80)
+        print("✓ ALL MODEL ARTIFACTS LOADED SUCCESSFULLY!")
+        print("="*80 + "\n")
         return True
+    
     except Exception as e:
-        print(f"Error loading model: {e}", file=sys.stderr)
+        print(f"\n✗ ERROR loading model: {e}")
+        import traceback
+        traceback.print_exc()
         return False
+
+# Load model at module level (when Gunicorn imports this file)
+print("Initializing application...")
+if not load_model():
+    print("WARNING: Failed to load model on startup")
 
 @app.before_request
 def before_request():
-    """
-    Ensure model is loaded before processing requests.
-    Skip this check for the 'health_check' endpoint.
-    """
-    # Allow the health check to run even if the model is not loaded
-    if request.endpoint == 'health_check':
-        return
-
-    if model is None or feature_columns is None:
-        return jsonify({'error': 'Model not loaded', 'status': 'error'}), 500
+    """Ensure model is loaded before processing requests."""
+    if model is None or feature_names is None:
+        return jsonify({
+            'error': 'Model or feature encoder not loaded',
+            'model_loaded': model is not None,
+            'feature_names_loaded': feature_names is not None,
+            'status': 'unhealthy'
+        }), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
-    model_loaded_status = model is not None and feature_columns is not None
-    
-    if model_loaded_status:
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'model_loaded': model_loaded_status
-        }), 200
-    else:
-        # Service is "unhealthy" if model isn't loaded
-        return jsonify({
-            'status': 'unhealthy',
-            'error': 'Model or feature encoder not loaded',
-            'timestamp': datetime.utcnow().isoformat(),
-            'model_loaded': model_loaded_status
-        }), 503 # 503 Service Unavailable is appropriate here
+    return jsonify({
+        'status': 'healthy' if (model is not None and feature_names is not None) else 'unhealthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'model_loaded': model is not None,
+        'scaler_loaded': scaler is not None,
+        'feature_names_loaded': feature_names is not None,
+        'model_type': model_metrics.get('model_type') if model_metrics else None,
+        'test_r2_score': model_metrics.get('testing_metrics', {}).get('r2_score') if model_metrics else None
+    }), 200 if (model is not None and feature_names is not None) else 500
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -89,14 +139,21 @@ def predict():
     Expected JSON input:
     {
         "Region": "North",
-        "Soil_Type": "Sandy",
-        "Crop": "Cotton",
-        "Rainfall_mm": 897.08,
-        "Temperature_Celsius": 27.68,
-        "Fertilizer_Used": false,
+        "Soil_Type": "Loam",
+        "Crop": "Wheat",
+        "Rainfall_mm": 800,
+        "Temperature_Celsius": 22,
+        "Fertilizer_Used": true,
         "Irrigation_Used": true,
-        "Weather_Condition": "Cloudy",
-        "Days_to_Harvest": 122
+        "Weather_Condition": "Sunny",
+        "Days_to_Harvest": 120
+    }
+    
+    Returns:
+    {
+        "predicted_yield": 6.55,
+        "unit": "tons_per_hectare",
+        "timestamp": "2025-01-01T12:00:00.000000"
     }
     """
     try:
@@ -123,24 +180,37 @@ def predict():
         input_encoded = pd.get_dummies(input_df, drop_first=True)
         
         # Ensure all feature columns are present (add missing columns with 0)
-        for col in feature_columns:
-            if col not in input_encoded.columns:
-                input_encoded[col] = 0
+        if feature_names:
+            for col in feature_names:
+                if col not in input_encoded.columns:
+                    input_encoded[col] = 0
+            
+            # Reorder columns to match the training data
+            input_encoded = input_encoded[feature_names]
         
-        # Reorder columns to match the training data
-        input_encoded = input_encoded[feature_columns]
+        # Scale features if scaler is available
+        if scaler is not None:
+            input_scaled = scaler.transform(input_encoded)
+            input_encoded = pd.DataFrame(input_scaled, columns=feature_names)
         
         # Make prediction
         prediction = model.predict(input_encoded)[0]
+        
+        # Ensure prediction is within reasonable bounds
+        prediction = max(0, min(15, float(prediction)))
         
         # Return prediction
         return jsonify({
             'predicted_yield': round(prediction, 4),
             'unit': 'tons_per_hectare',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat(),
+            'confidence': model_metrics.get('testing_metrics', {}).get('r2_score') if model_metrics else None
         }), 200
     
     except Exception as e:
+        print(f"Prediction error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Prediction error: {str(e)}'}), 500
 
 @app.route('/batch-predict', methods=['POST'])
@@ -153,9 +223,17 @@ def batch_predict():
         "data": [
             {
                 "Region": "North",
-                "Soil_Type": "Sandy",
+                "Soil_Type": "Loam",
                 ...
             },
+            ...
+        ]
+    }
+    
+    Returns:
+    {
+        "predictions": [
+            {"predicted_yield": 6.55, "timestamp": "..."},
             ...
         ]
     }
@@ -179,12 +257,18 @@ def batch_predict():
         input_encoded = pd.get_dummies(input_df, drop_first=True)
         
         # Ensure all feature columns are present
-        for col in feature_columns:
-            if col not in input_encoded.columns:
-                input_encoded[col] = 0
+        if feature_names:
+            for col in feature_names:
+                if col not in input_encoded.columns:
+                    input_encoded[col] = 0
+            
+            # Reorder columns
+            input_encoded = input_encoded[feature_names]
         
-        # Reorder columns
-        input_encoded = input_encoded[feature_columns]
+        # Scale features if scaler is available
+        if scaler is not None:
+            input_scaled = scaler.transform(input_encoded)
+            input_encoded = pd.DataFrame(input_scaled, columns=feature_names)
         
         # Make predictions
         predictions = model.predict(input_encoded)
@@ -192,26 +276,49 @@ def batch_predict():
         # Format results
         results = [
             {
-                'predicted_yield': round(pred, 4),
+                'predicted_yield': round(max(0, min(15, float(pred))), 4),
                 'unit': 'tons_per_hectare',
                 'timestamp': datetime.utcnow().isoformat()
             }
             for pred in predictions
         ]
         
-        return jsonify({'predictions': results}), 200
+        return jsonify({
+            'predictions': results,
+            'count': len(results)
+        }), 200
     
     except Exception as e:
+        print(f"Batch prediction error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Batch prediction error: {str(e)}'}), 500
 
 @app.route('/info', methods=['GET'])
 def info():
     """Return model information."""
     return jsonify({
-        'model_type': 'Linear Regression',
-        'features': feature_columns,
-        'feature_count': len(feature_columns) if feature_columns else 0,
+        'model_type': model_metrics.get('model_type') if model_metrics else 'Unknown',
+        'features': feature_names,
+        'feature_count': len(feature_names) if feature_names else 0,
+        'metrics': model_metrics.get('testing_metrics') if model_metrics else None,
         'timestamp': datetime.utcnow().isoformat()
+    }), 200
+
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint with API documentation."""
+    return jsonify({
+        'name': 'Crop Yield Prediction API',
+        'version': '1.0.0',
+        'endpoints': {
+            'GET /': 'API documentation',
+            'GET /health': 'Health check',
+            'GET /info': 'Model information',
+            'POST /predict': 'Single prediction',
+            'POST /batch-predict': 'Batch predictions'
+        },
+        'status': 'running' if (model is not None and feature_names is not None) else 'unhealthy'
     }), 200
 
 @app.errorhandler(404)
@@ -224,24 +331,30 @@ def internal_error(error):
     """Handle 500 errors."""
     return jsonify({'error': 'Internal server error'}), 500
 
-# --- Load model on startup ---
-# This code runs when the file is imported by Gunicorn or run directly.
-if not load_model():
-    print("FATAL: Failed to load model on startup. Check 'models' dir.", file=sys.stderr)
-    # The app will continue to run, but /health will report 'model_loaded: false'
-    # and all other endpoints will return 500 (due to @before_request).
-
 if __name__ == '__main__':
-    # This block only runs when script is executed directly (e.g., python predict.py)
+    print("\n" + "="*80)
+    print("CROP YIELD PREDICTION API - STARTUP")
+    print("="*80)
+    print(f"Working directory: {os.getcwd()}")
+    print(f"Model file: {MODEL_FILE}")
+    print(f"Scaler file: {SCALER_FILE}")
+    print(f"Feature names file: {FEATURE_NAMES_FILE}")
+    print(f"Metrics file: {METRICS_FILE}")
     
-    # Check if loading failed (for local development)
-    if model is None or feature_columns is None:
-        print("Model was not loaded successfully. Exiting.", file=sys.stderr)
-        sys.exit(1)
+    # Load model on startup (if not already loaded)
+    if model is None:
+        if not load_model():
+            print("\n" + "="*80)
+            print("✗ ERROR: Failed to load model. Exiting.")
+            print("="*80)
+            sys.exit(1)
     
     # Get port from environment or default to 5000
     port = int(os.environ.get('PORT', 5000))
     
-    print(f"--- Running Flask app in DEBUG mode on http://0.0.0.0:{port} ---")
-    # Run Flask app with debug=True for local development
-    app.run(host='0.0.0.0', port=port, debug=True)
+    print("\n" + "="*80)
+    print(f"Starting Flask API on port {port}...")
+    print("="*80 + "\n")
+    
+    # Run Flask app
+    app.run(host='0.0.0.0', port=port, debug=False)

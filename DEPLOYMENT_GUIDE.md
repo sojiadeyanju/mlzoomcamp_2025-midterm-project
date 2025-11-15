@@ -12,7 +12,8 @@ crop_yield_predictor/
 ├── Dockerfile              # Docker container configuration
 ├── models/                 # Directory for trained models (created at runtime)
 │   ├── crop_yield_model.pkl
-│   ├── feature_encoder.pkl
+│   ├── feature_names.json
+|   ├── scaler.pkl
 │   └── model_metrics.txt
 └── DEPLOYMENT_GUIDE.md     # This file
 ```
@@ -26,7 +27,8 @@ Before deploying, ensure you have the following installed:
 
 ## Step 1: Prepare the Training Data
 
-Place your cleaned crop yield dataset (`crop_yield_cleaned.csv`) in the project directory or specify its path via environment variables.
+Download and place the cleaned crop yield dataset (`crop_yield_cleaned.csv`) in the project directory.
+Download here: https://drive.google.com/file/d/15HJ42p6R88ERdIyC7Ih62Muz8CjufK9K/
 
 ## Step 2: Train the Model Locally (Optional)
 
@@ -55,10 +57,6 @@ docker images | grep crop-yield-predictor
 ```
 
 ## Step 4: Run the Container Locally
-
-### Run the Container with Pre-trained Model
-
-If you have already trained the model locally, copy the `models/` directory into the container:
 
 ```bash
 # Run the container
