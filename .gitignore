@@ -90,5 +90,8 @@ target/
 .venv/
 
 # Others
-data/crop_yield_cleaned.csv
+data/
+models/
 Docker-Setup-and-Troubleshooting-Guide.md
+DEPLOYMENT_GUIDE.md
+crop_yield_ui.html
