@@ -209,6 +209,7 @@ For a crop with actual yield of 5.5 tons/hectare:
 ├── predict.py                                   # Flask API for predictions
 ├── requirements.txt                             # Python dependencies
 ├── Dockerfile                                   # Docker containerization
+├── crop_yield_ui.html                           # Frontend HTML file
 ```
 
 ## Installation
@@ -390,21 +391,19 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
 
 ### Access Web Interface
 
-   - Open `crop_yield_ui.html` locally
-   - Use the prediction form to make real-time predictions
-   - View model information and metrics
+- Open `crop_yield_ui.html` locally
+- Use the prediction form to make real-time predictions
+- View model information and metrics
 
-### Cloud Deployment - Google Cloud Platform (GCP) - Using Cloud Run
-### Steps:
-
-   - Install Google Cloud SDK
-   - Follow: https://cloud.google.com/sdk/docs/install
+### Cloud Deployment: Google Cloud Platform (GCP) - Using Cloud Run
+Steps:
+- Install Google Cloud SDK
+- Follow: https://cloud.google.com/sdk/docs/install
 
    ```bash
    gcloud init
    ```
-
-   - Enable required APIs
+- Enable required APIs
 
     ```bash
     gcloud services enable run.googleapis.com
@@ -413,7 +412,7 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
   
 ### Build and deploy
 
-   - Set your project ID
+- Set your project ID
 
    ```bash
    gcloud config set project YOUR_PROJECT_ID
@@ -425,7 +424,7 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
     gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/crop-yield-api
     ```
 
-### Deploy to Cloud Run
+### Deploy API
 
    ```bash
    gcloud run deploy crop-yield-api \
@@ -437,54 +436,53 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
    --cpu 2
    ```
 
-### Get the URL
+### Get API URL
 The command will output your service URL (e.g., https://crop-yield-api-xxxxx.run.app)
 
 ### Host Frontend on Firebase Hosting
-### Steps:
-
-   - Install Firebase CLI
+Steps:
+- Install Firebase CLI
 
    ```bash
    npm install -g firebase-tools
    ```
 
-   - Login
+- Login
 
    ```bash
    firebase login
    ```
 
-   - Initialize Firebase in your project folder
+- Initialize Firebase in your project folder
    
    ```bash
    firebase init hosting
    ```
 
-   ### Select:
-   ### - Use existing project or create new one
-   ### - Public directory: . (current directory)
-   ### - Configure as single-page app: No
-   ### - Set up automatic builds: No
+Select:
+- Use existing project or create new one
+- Public directory: . (current directory)
+- Configure as single-page app: No
+- Set up automatic builds: No
 
-   - Update HTML with your API URL
-### Edit crop_yield_ui.html and rename to index.html
+- Update HTML with your API URL
+Edit crop_yield_ui.html and rename to index.html
 
    ```bash
    mv crop_yield_ui.html index.html
    ```
 
-   - Deploy
+- Deploy
    
    ```bash
    firebase deploy --only hosting
    ```
 
-### Your frontend will be live at: https://YOUR-PROJECT-ID.web.app
+Your frontend will be live at: https://YOUR-PROJECT-ID.web.app
 
-### Access my deployed API here: https://mlzoomcamp-2025-midterm-project-628112255890.europe-west1.run.app
+Access my deployed API here: https://mlzoomcamp-2025-midterm-project-628112255890.europe-west1.run.app
 
-### Access my deployed frontend here: https://crop-yield-ui.web.app/
+Access my deployed frontend here: https://crop-yield-ui.web.app/
 
 ## Model Artifacts
 
