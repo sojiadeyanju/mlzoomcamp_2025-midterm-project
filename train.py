@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 # Define paths
-DATA_FILE = os.environ.get('DATA_FILE', 'data/crop_yield_cleaned.csv')
+DATA_FILE = os.environ.get('DATA_FILE', 'https://s3.g.s4.mega.io/leqjk5i2w4jqeraabs6znaeb4yknbuemflafz/data/crop_yield_cleaned.csv')
 MODEL_FILE = os.environ.get('MODEL_FILE', 'models/crop_yield_model.pkl')
 ENCODER_FILE = os.environ.get('ENCODER_FILE', 'models/feature_encoder.pkl')
 METRICS_FILE = os.environ.get('METRICS_FILE', 'models/model_metrics.txt')

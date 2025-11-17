@@ -40,6 +40,10 @@ The primary objectives of this project are:
 
 The project uses the **Agriculture Crop Yield Dataset** containing 1,000,000 records of crop production data with 10 features and 1 target variable.
 
+Main data source: https://s3.g.s4.mega.io/leqjk5i2w4jqeraabs6znaeb4yknbuemflafz/data/crop_yield.csv
+
+Cleaned data source: https://s3.g.s4.mega.io/leqjk5i2w4jqeraabs6znaeb4yknbuemflafz/data/crop_yield_cleaned.csv
+
 ### Features
 
 The dataset includes the following features:
@@ -198,44 +202,13 @@ For a crop with actual yield of 5.5 tons/hectare:
 ## Project Structure
 
 ```
-crop_yield_predictor/
 ├── README.md                                    # This file
-├── DEPLOYMENT_GUIDE.md                          # Cloud deployment instructions
-├── DOCKER_SETUP_GUIDE.md                        # Docker setup and troubleshooting
-├── SVR_Performance_Analysis.md                  # SVR performance analysis
-│
-├── Crop_Yield_Prediction_Complete_Pipeline.ipynb    # Full ML pipeline notebook
-├── Crop_Yield_Prediction_Optimized.ipynb            # Optimized notebook (20% data)
+├── crop_yield_prediction.ipynb                  # Jupyter notebook
 │
 ├── train.py                                     # Model training script
 ├── predict.py                                   # Flask API for predictions
 ├── requirements.txt                             # Python dependencies
 ├── Dockerfile                                   # Docker containerization
-│
-├── models/
-│   ├── crop_yield_model.pkl                    # Trained Gradient Boosting model
-│   ├── scaler.pkl                              # StandardScaler for feature normalization
-│   ├── model_metrics.json                      # Model performance metrics
-│   └── feature_names.json                      # Feature names in correct order
-│
-├── server/                                      # Web service backend
-│   ├── routers.ts                              # tRPC API endpoints
-│   ├── ml-model.ts                             # ML model integration
-│   ├── db.ts                                   # Database queries
-│   └── _core/                                  # Core framework files
-│
-├── client/                                      # Web service frontend
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Home.tsx                        # Landing page
-│   │   │   ├── Prediction.tsx                  # Prediction form
-│   │   │   └── NotFound.tsx                    # 404 page
-│   │   ├── App.tsx                             # Main app router
-│   │   └── index.css                           # Global styles
-│   └── public/                                 # Static assets
-│
-└── drizzle/
-    └── schema.ts                               # Database schema
 ```
 
 ## Installation
@@ -251,14 +224,17 @@ crop_yield_predictor/
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/crop-yield-predictor.git
-   cd crop_yield_predictor
+   git clone https://github.com/sojiadeyanju/mlzoomcamp_2025-midterm-project.git
+   cd mlzoomcamp_2025-midterm-project
    ```
 
 2. **Create a Python virtual environment**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python3 -m venv .venv
+   # On Windows: 
+   .venv\Scripts\activate
+   # On MacOs: 
+   source .venv/bin/activate 
    ```
 
 3. **Install Python dependencies**
@@ -286,7 +262,7 @@ This script will:
 2. Sample 20% of data for efficient training
 3. Perform feature engineering and scaling
 4. Train the Gradient Boosting model
-5. Save the trained model and artifacts to the `models/` directory
+5. Crate and save the trained model and artifacts to `models/` directory
 6. Display performance metrics and feature importance
 
 **Expected output:**
@@ -376,7 +352,7 @@ curl http://localhost:5000/info
 To explore the data and model training process interactively:
 
 ```bash
-jupyter notebook Crop_Yield_Prediction_Optimized.ipynb
+jupyter notebook crop_yield_prediction.ipynb
 ```
 
 The optimized notebook uses 20% of the data for faster execution while maintaining statistical validity. It includes:
@@ -394,7 +370,7 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
 
 1. **Build the Docker image**
    ```bash
-   docker build -t crop-yield-predictor:latest .
+   docker build -t crop-yield-predictor .
    ```
 
 2. **Run the container**
@@ -403,7 +379,7 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
      -p 5000:5000 \
      -v $(pwd)/models:/app/models \
      --name crop-yield-api \
-     crop-yield-predictor:latest
+     crop-yield-predictor
    ```
 
 3. **Verify the container is running**
@@ -412,37 +388,103 @@ The optimized notebook uses 20% of the data for faster execution while maintaini
    curl http://localhost:5000/health
    ```
 
-For detailed Docker troubleshooting, see [DOCKER_SETUP_GUIDE.md](DOCKER_SETUP_GUIDE.md).
+### Access Web Interface
 
-### Web Service Deployment
-
-The project includes a full-stack web application with React frontend and tRPC backend:
-
-1. **Start the development server**
-   ```bash
-   pnpm dev
-   ```
-
-2. **Access the web interface**
-   - Navigate to `http://localhost:3000`
+   - Open `crop_yield_ui.html` locally
    - Use the prediction form to make real-time predictions
    - View model information and metrics
 
-3. **Build for production**
+### Cloud Deployment - Google Cloud Platform (GCP) - Using Cloud Run
+### Steps:
+
+   - Install Google Cloud SDK
+   - Follow: https://cloud.google.com/sdk/docs/install
+
    ```bash
-   pnpm build
-   pnpm start
+   gcloud init
    ```
 
-### Cloud Deployment
+   - Enable required APIs
 
-For deploying to cloud platforms (AWS, GCP, Azure), see [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for:
-- Container Registry setup
-- Kubernetes deployment
-- Serverless function deployment
-- API Gateway configuration
-- Database setup
-- Monitoring and logging
+    ```bash
+    gcloud services enable run.googleapis.com
+    gcloud services enable containerregistry.googleapis.com
+    ```
+  
+### Build and deploy
+
+   - Set your project ID
+
+   ```bash
+   gcloud config set project YOUR_PROJECT_ID
+   ```
+
+### Build the container
+
+    ```bash
+    gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/crop-yield-api
+    ```
+
+### Deploy to Cloud Run
+
+   ```bash
+   gcloud run deploy crop-yield-api \
+   --image gcr.io/YOUR_PROJECT_ID/crop-yield-api \
+   --platform managed \
+   --region us-central1 \
+   --allow-unauthenticated \
+   --memory 2Gi \
+   --cpu 2
+   ```
+
+### Get the URL
+The command will output your service URL (e.g., https://crop-yield-api-xxxxx.run.app)
+
+### Host Frontend on Firebase Hosting
+### Steps:
+
+   - Install Firebase CLI
+
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+   - Login
+
+   ```bash
+   firebase login
+   ```
+
+   - Initialize Firebase in your project folder
+   
+   ```bash
+   firebase init hosting
+   ```
+
+   ### Select:
+   ### - Use existing project or create new one
+   ### - Public directory: . (current directory)
+   ### - Configure as single-page app: No
+   ### - Set up automatic builds: No
+
+   - Update HTML with your API URL
+### Edit crop_yield_ui.html and rename to index.html
+
+   ```bash
+   mv crop_yield_ui.html index.html
+   ```
+
+   - Deploy
+   
+   ```bash
+   firebase deploy --only hosting
+   ```
+
+### Your frontend will be live at: https://YOUR-PROJECT-ID.web.app
+
+### Access my deployed API here: https://mlzoomcamp-2025-midterm-project-628112255890.europe-west1.run.app
+
+### Access my deployed frontend here: https://crop-yield-ui.web.app/
 
 ## Model Artifacts
 
@@ -505,7 +547,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- Agriculture Crop Yield Dataset from [source]
+- Agriculture Crop Yield Dataset
 - scikit-learn library for machine learning algorithms
 - Flask framework for API development
 - React and tRPC for web service frontend
