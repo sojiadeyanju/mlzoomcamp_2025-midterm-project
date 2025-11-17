@@ -420,9 +420,9 @@ Steps:
 
 ### Build the container
 
-    ```bash
+   ```bash
     gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/crop-yield-api
-    ```
+   ```
 
 ### Deploy API
 
